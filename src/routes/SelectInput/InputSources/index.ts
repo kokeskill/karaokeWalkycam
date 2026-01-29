@@ -32,11 +32,11 @@ class InputSourceListManager {
       source.getInputs().then((list) => {
         this.inputList[source.inputName].list = list;
         this.inputList[source.inputName].initialised = true;
-        events.inputListChanged.dispatch(true);
+        events.inputListChanged.dispatch(true, []);
 
         source.subscribeToListChange(async () => {
           this.inputList[source.inputName].list = await source.getInputs();
-          events.inputListChanged.dispatch(false);
+          events.inputListChanged.dispatch(false, []);
         });
       });
     }

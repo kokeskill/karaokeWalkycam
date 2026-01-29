@@ -1,3 +1,5 @@
+// src/routes/SelectInput/InputSources/Microphone.ts
+
 import { captureException } from '@sentry/react';
 import { range } from 'es-toolkit';
 import { getInputId } from '~/modules/Players/utils';
@@ -8,6 +10,15 @@ interface NameMapper {
   test: (label: string, channel: number, channels: number) => boolean;
   map: (label: string, channel: number) => string;
 }
+
+const micDebugEnabled = () =>
+  (typeof window !== 'undefined' && window.localStorage?.getItem('AK_MIC_DEBUG') === '1') || false;
+
+const micLog = (...args: any[]) => {
+  if (!micDebugEnabled()) return;
+   
+  console.log('[AK_MIC]', ...args);
+};
 
 const singstarWirelessMicMapper: NameMapper = {
   test: (label) =>
@@ -38,6 +49,20 @@ const mapInputName = (label: string, channel: number, channels: number) => {
   return channels > 1 ? `${label} (ch ${channel + 1})` : label;
 };
 
+// ✅ Heurística: solo SingStar tratamos como 2ch
+const guessChannels = (label: string) => {
+  const l = (label ?? '').toLowerCase();
+  if (
+    l.includes('singstar') ||
+    l.includes('usbmic serial#') ||
+    l.includes('wireless mic #') ||
+    l.includes('sony wireless singstar')
+  ) {
+    return 2;
+  }
+  return 1;
+};
+
 export class MicrophoneInputSource {
   private static inputList: InputSource[] = [];
   public static readonly inputName = 'Microphone';
@@ -51,45 +76,41 @@ export class MicrophoneInputSource {
     let devices: MediaDeviceInfo[] = [];
 
     try {
+      micLog('Requesting mic permission (for enumerateDevices)...');
       await userMediaService.getUserMedia({ audio: true, video: false });
 
       devices = await userMediaService.enumerateDevices();
+
+      micLog(
+        'Enumerated devices:',
+        devices.map((d) => ({ kind: d.kind, label: d.label, deviceId: d.deviceId })),
+      );
     } catch (e) {
       captureException(e, { level: 'warning', extra: { message: 'Microphone.getInputs' } });
       console.warn(e);
     }
 
-    const inputList = await Promise.all(
-      devices
-        .filter((device) => device.kind === 'audioinput')
-        .map(async (device) => {
-          // device.getCapabilities() stopped returning channelCount, so instead we have to get
-          // the stream and check the track's settings to get the channel count
-          let channels = 1;
-          try {
-            const stream = await userMediaService.getUserMedia({
-              audio: {
-                deviceId: { exact: device.deviceId },
-                echoCancellation: { exact: false },
-              },
-              video: false,
-            });
-            channels = stream.getAudioTracks()[0].getSettings().channelCount ?? 1;
-          } catch (e) {
-            console.warn(e);
-          }
+    const inputList = devices
+      .filter((device) => device.kind === 'audioinput')
+      .flatMap((device) => {
+        const channels = guessChannels(device.label);
 
-          return range(0, channels).map((channel) => ({
-            label: mapInputName(device.label, channel, channels),
-            channel,
-            channels,
-            deviceId: device.deviceId,
-            id: getInputId({ deviceId: device.deviceId, channel }),
-            preferred: getPreferred(device.label, channel, channels),
-          }));
-        }),
-    );
-    MicrophoneInputSource.inputList = inputList.flat();
+        // ⚠️ Si quieres seguir “probando” canales para depurar, hazlo SOLO en debug:
+        // if (micDebugEnabled()) { ...probe... }  (pero no lo recomiendo para runtime)
+
+        return range(0, channels).map((channel) => ({
+          label: mapInputName(device.label, channel, channels),
+          channel,
+          channels,
+          deviceId: device.deviceId,
+          id: getInputId({ deviceId: device.deviceId, channel }),
+          preferred: getPreferred(device.label, channel, channels),
+        }));
+      });
+
+    MicrophoneInputSource.inputList = inputList;
+
+    micLog('Built microphone input list:', MicrophoneInputSource.inputList);
 
     return MicrophoneInputSource.inputList;
   };

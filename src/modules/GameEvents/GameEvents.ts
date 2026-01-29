@@ -84,7 +84,7 @@ export const events = {
       newInput: SelectedPlayerInput | undefined,
     ) => void
   >('playerInputChanged'),
-  inputListChanged: new GameEvent<(initial: boolean) => void>('inputListChanged'),
+  inputListChanged: new GameEvent<(initial: boolean, inputs: SelectedPlayerInput[]) => void>('inputListChanged'),
 
   karaokeConnectionStatusChange: new GameEvent<
     (

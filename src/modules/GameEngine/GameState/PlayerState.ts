@@ -35,9 +35,18 @@ class PlayerState {
 
   public update = () => {
     const currentTime = this.gameState.getCurrentTime();
-
     const frequency = InputManager.getPlayerFrequency(this.number);
     const currentTimestamp = currentTime - InputManager.getPlayerInputLag(this.number);
+    const lag = InputManager.getPlayerInputLag(this.number);
+
+    console.log('[DBG_SCORE]', {
+      currentTime,
+      lag,
+      currentTimestamp,
+      beatLen: this.gameState.getSongBeatLength(),
+      recordBeat: currentTimestamp / this.gameState.getSongBeatLength(),
+      freq: InputManager.getPlayerFrequency(this.number),
+    });
 
     // If it's a pack of frequencies (from remote mic), restore last "real" frequencies,
     // add and recalculate for the received pack, and store newly computed

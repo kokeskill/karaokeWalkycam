@@ -19,7 +19,7 @@ export const useVideoPlayer = (
       const interval = setInterval(async () => {
         if (!playerRef.current) return;
 
-        const time = Math.max(0, (await playerRef.current.getCurrentTime()) * 1000 - inputLag);
+        const time = Math.max(0, (await playerRef.current.getCurrentTime()) * 1000);
         setCurrentTime(time);
         onTimeUpdate?.(time);
       }, 1000 / FPSCountSetting.get());

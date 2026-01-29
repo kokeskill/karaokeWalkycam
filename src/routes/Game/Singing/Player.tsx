@@ -87,6 +87,7 @@ function Player({
       onCurrentTimeUpdate?.(time);
       GameState.setCurrentTime(time);
       GameState.update();
+      console.log('[DBG_TIME] time from player:', time);
     },
     [onCurrentTimeUpdate],
   );
@@ -96,6 +97,13 @@ function Player({
   useEffect(() => {
     GameState.setSong(song);
     GameState.setSingSetup(singSetup);
+    console.log('[DBG_SONG]', {
+      bpm: song.bpm,
+      gap: song.gap,
+      videoGap: song.videoGap,
+      beatLen: 60_000 / (song.bpm as number),
+      beatLenFromFn: GameState.getSongBeatLength?.(),
+    });
 
     return () => {
       GameState.resetSingSetup();

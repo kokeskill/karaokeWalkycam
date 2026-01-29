@@ -1,9 +1,20 @@
+// src/modules/GameEngine/Input/SimplifiedMic.tsx
+
 import { captureException } from '@sentry/react';
 import InputInterface from '~/modules/GameEngine/Input/Interface';
 import AubioStrategy from '~/modules/GameEngine/Input/MicStrategies/Aubio';
 import events from '~/modules/GameEvents/GameEvents';
 import userMediaService from '~/modules/UserMedia/userMediaService';
 import Listener from '~/modules/utils/Listener';
+
+const micDebugEnabled = () =>
+  (typeof window !== 'undefined' && window.localStorage?.getItem('AK_MIC_DEBUG') === '1') || false;
+
+const micLog = (...args: any[]) => {
+  if (!micDebugEnabled()) return;
+   
+  console.log('[AK_MIC]', ...args);
+};
 
 class SimplifiedMic extends Listener<[number, number]> implements InputInterface {
   private stream: MediaStream | null = null;
@@ -21,6 +32,7 @@ class SimplifiedMic extends Listener<[number, number]> implements InputInterface
     this.startedMonitoring = true;
 
     try {
+      micLog('SimplifiedMic.startMonitoring - requesting stream...');
       this.stream = await userMediaService.getUserMedia({
         audio: {
           // echoCancellation is turned on because without it there is silence from the mic
@@ -31,8 +43,24 @@ class SimplifiedMic extends Listener<[number, number]> implements InputInterface
         },
         video: false,
       });
+
+      const track = this.stream.getAudioTracks()[0];
+      micLog('SimplifiedMic stream acquired:', {
+        readyState: track?.readyState,
+        muted: (track as any)?.muted,
+        enabled: track?.enabled,
+        settings: track?.getSettings?.(),
+        constraints: track?.getConstraints?.(),
+      });
+
       try {
         this.context = new AudioContext();
+        micLog('AudioContext created:', { state: this.context.state, sampleRate: this.context.sampleRate });
+
+        if (this.context.state === 'suspended') {
+          await this.context.resume();
+          micLog('AudioContext resumed:', { state: this.context.state });
+        }
 
         const source = this.context.createMediaStreamSource(this.stream);
 
@@ -43,19 +71,25 @@ class SimplifiedMic extends Listener<[number, number]> implements InputInterface
 
         const strategy = new AubioStrategy();
         await strategy.init(this.context, analyserCh0.fftSize);
+        micLog('AubioStrategy init OK');
+
+        let tick = 0;
 
         this.interval = setInterval(async () => {
           const dataCh0 = new Float32Array(analyserCh0.fftSize);
 
           analyserCh0.getFloatTimeDomainData(dataCh0);
-          const freq = await strategy.getFrequency(dataCh0);
           const volume = this.calculateVolume(dataCh0);
+          const freq = await strategy.getFrequency(dataCh0);
 
           this.frequencies = [freq, freq];
-
           this.volumes = [volume, volume];
-
           this.onUpdate(freq, volume);
+
+          tick++;
+          if (micDebugEnabled() && tick % 40 === 0) {
+            micLog('SimplifiedMic tick:', { volume, freq });
+          }
         }, this.context.sampleRate / analyserCh0.fftSize);
 
         events.micMonitoringStarted.dispatch();
@@ -67,6 +101,7 @@ class SimplifiedMic extends Listener<[number, number]> implements InputInterface
       if (e.name !== 'NotAllowedError') {
         captureException(e, { level: 'warning', extra: { message: 'SimplifiedMic.startMonitoring' } });
       }
+      micLog('SimplifiedMic.getUserMedia failed:', { name: e?.name, message: e?.message, constraint: e?.constraint });
       console.warn(e);
     }
   };
@@ -79,6 +114,7 @@ class SimplifiedMic extends Listener<[number, number]> implements InputInterface
 
   public stopMonitoring = async () => {
     if (!this.startedMonitoring) return;
+    micLog('SimplifiedMic.stopMonitoring');
     this.startedMonitoring = false;
     this.interval && clearInterval(this.interval);
     this.stream?.getTracks().forEach(function (track) {

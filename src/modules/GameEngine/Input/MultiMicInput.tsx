@@ -9,59 +9,71 @@ const isDeviceSelectedForMultipleChannels = (allInputs: SelectedPlayerInput[] = 
 
 class MultiMicInput implements InputInterface {
   private devices: Record<string, InputInterface> = {};
+
   public startMonitoring = async (deviceId?: string, allInputs?: SelectedPlayerInput[]) => {
-    console.log(this.devices);
     if (deviceId) {
       if (!this.devices[deviceId]) {
         this.devices[deviceId] = isDeviceSelectedForMultipleChannels(allInputs, deviceId)
           ? new MicInput(2)
           : new MicInput(1);
       }
-      await this.devices[deviceId].startMonitoring(deviceId);
+      await this.devices[deviceId].startMonitoring(deviceId, allInputs);
     }
   };
 
   public getFrequencies = (deviceId?: string) => {
     if (deviceId && this.devices[deviceId]) {
-      return this.devices[deviceId].getFrequencies();
+      return this.devices[deviceId].getFrequencies(deviceId) as number[];
     }
     return [0, 0];
   };
 
   public getVolumes = (deviceId?: string) => {
     if (deviceId && this.devices[deviceId]) {
-      return this.devices[deviceId].getVolumes();
+      return this.devices[deviceId].getVolumes(deviceId);
     }
     return [0, 0];
   };
+
   public clearFrequencies = (deviceId?: string) => {
     if (deviceId && this.devices[deviceId]) {
       return this.devices[deviceId].clearFrequencies(deviceId);
     }
   };
-  public stopMonitoring = async () => {
+
+  // ✅ soporta parar un device específico o todos
+  public stopMonitoring = async (deviceId?: string) => {
+    if (deviceId) {
+      const dev = this.devices[deviceId];
+      if (dev) {
+        await dev.stopMonitoring(deviceId);
+        delete this.devices[deviceId];
+      }
+      return;
+    }
+
     await Promise.all(Object.values(this.devices).map((device) => device.stopMonitoring()));
     this.devices = {};
   };
 
   public getInputLag = (deviceId?: string) => {
     if (deviceId && this.devices[deviceId]) {
-      return this.devices[deviceId].getInputLag();
+      return this.devices[deviceId].getInputLag(deviceId);
     }
-
     return 180;
   };
+
   public requestReadiness = async (deviceId?: string) => {
     if (deviceId && this.devices[deviceId]) {
-      return this.devices[deviceId].requestReadiness();
+      return this.devices[deviceId].requestReadiness(deviceId);
     }
-
     return true;
   };
 
-  public getStatus = (deviceId?: string) => {
+  // ✅ FIRMA corregida para coincidir con InputInterface
+  public getStatus = (deviceId?: string, channel?: number) => {
     if (deviceId && this.devices[deviceId]) {
-      return this.devices[deviceId].getStatus();
+      return this.devices[deviceId].getStatus(deviceId, channel);
     }
     return 'ok' as const;
   };

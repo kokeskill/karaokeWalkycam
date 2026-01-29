@@ -14,10 +14,17 @@ class InputManager {
   private isMonitoring = false;
 
   constructor() {
-    events.inputListChanged.subscribe(async () => {
+    events.inputListChanged.subscribe(async (payload: any) => {
+      console.log('[AK_MIC] inputListChanged received', {
+        isMonitoring: this.isMonitoring,
+        payload,
+        time: new Date().toISOString(),
+      });
+
       if (this.isMonitoring) {
+        console.log('[AK_MIC] inputListChanged => restarting monitoring');
         await this.stopMonitoring();
-        this.startMonitoring();
+        await this.startMonitoring();
       }
     });
   }
