@@ -96,14 +96,18 @@ function Player({
 
   useEffect(() => {
     GameState.setSong(song);
-    GameState.setSingSetup(singSetup);
     console.log('[DBG_SONG]', {
+      id: song.id,
       bpm: song.bpm,
-      gap: song.gap,
-      videoGap: song.videoGap,
-      beatLen: 60_000 / (song.bpm as number),
-      beatLenFromFn: GameState.getSongBeatLength?.(),
+      bar: song.bar,
+      hasMerged: !!song.mergedTrack,
+      tracks: song.tracks?.length,
+      mergedSections: song.mergedTrack?.sections?.length,
+      track0Sections: song.tracks?.[0]?.sections?.length,
+      track0FirstSectionKeys: song.tracks?.[0]?.sections?.[0] ? Object.keys(song.tracks[0].sections[0]) : null,
     });
+
+    GameState.setSingSetup(singSetup);
 
     return () => {
       GameState.resetSingSetup();

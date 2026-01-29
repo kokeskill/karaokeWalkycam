@@ -20,6 +20,7 @@ class PlayerState {
   public constructor(
     private number: 0 | 1 | 2 | 3,
     private gameState: GameStateClass,
+
   ) {
     this.getTrack()
       .sections.filter(isNotesSection)
@@ -29,7 +30,14 @@ class PlayerState {
           this.max = Math.max(this.max, note.pitch);
         }),
       );
+    const track = this.getTrack();
+    const notesSections = track.sections.filter(isNotesSection);
+    const notesCount = notesSections.reduce((acc, s) => acc + s.notes.length, 0);
+    console.log('[DBG_NOTES]', { player: this.number, notesSections: notesSections.length, notesCount });
+
   }
+
+
 
   public getNumber = () => this.number;
 
